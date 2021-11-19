@@ -46,6 +46,6 @@ area=-A5000/1/4
 
 gmt begin $name
     gmt basemap $region $proj -Bxg0.1d -Byg0.1d
-    gmt pstext la-ca-6min-name.xyt $region $proj -F'+f3p'
+    gmt pstext la-ca-6min-name.xyt $region $proj -F'+f5p'
     gmt coast $area $region $proj -N1/,,.- -N2/,,.- -N3/,,.- -W
 gmt end # show
