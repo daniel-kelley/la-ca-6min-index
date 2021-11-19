@@ -1,0 +1,249 @@
+#!/usr/bin/env ruby
+#
+# 0 Series
+# 1 Version
+# 2 Cell ID
+# 3 Map Name
+# 4 Primary State
+# 5 Scale
+# 6 Date On Map
+# 7 Imprint Year
+# 8 Woodland Tint
+# 9 Visual Version Number
+# 10 Photo Inspection Year
+# 11 Photo Revision Year
+# 12 Aerial Photo Year
+# 13 Edit Year
+# 14 Field Check Year
+# 15 Survey Year
+# 16 Datum
+# 17 Projection
+# 18 Advance
+# 19 Preliminary
+# 20 Provisional
+# 21 Interim
+# 22 Planimetric
+# 23 Special Printing
+# 24 Special Map
+# 25 Shaded Relief
+# 26 Orthophoto
+# 27 Pub USGS
+# 28 Pub Army Corps Eng
+# 29 Pub Army Map
+# 30 Pub Forest Serv
+# 31 Pub Military Other
+# 32 Pub Reclamation
+# 33 Pub War Dept
+# 34 Pub Bur Land Mgmt
+# 35 Pub Natl Park Serv
+# 36 Pub Indian Affairs
+# 37 Pub EPA
+# 38 Pub Tenn Valley Auth
+# 39 Pub US Commerce
+# 40 Keywords
+# 41 Map Language
+# 42 Scanner Resolution
+# 43 Cell Name
+# 44 Primary State Name
+# 45 N Lat
+# 46 W Long
+# 47 S Lat
+# 48 E Long
+# 49 Link to HTMC Metadata
+# 50 Download GeoPDF
+# 51 View FGDC Metadata XML
+# 52 View Thumbnail Image
+# 53 Scan ID
+# 54 GDA Item ID
+# 55 Create Date
+# 56 Byte Count
+# 57 Grid Size
+# 58 Download Product S3
+# 59 View Thumbnail Image S3
+# 60 NRN
+# 61 NSN
+
+require 'csv'
+require 'optparse'
+
+class ExtractName
+
+  TOPOMAPS = 'topomaps_all.csv'
+
+  # Map serie
+  SERIES = {
+    '6min' => 0.1,
+    '7.5min' => 0.125,
+    '15min' => 0.250
+  }
+
+  SERIES_EPSILON = 0.001
+
+  # set of vars
+  def initialize
+    # indexed by x, y, map name
+    @data = {}
+    @header = false
+    @debug = false
+    @input = TOPOMAPS
+    @cvt_i = false
+    @bounds = nil
+    @mask = nil
+    @series = nil
+    @output = STDOUT
+    @region = []
+  end
+
+  # parse options
+  def options(argv)
+    @argv = argv
+    rc = true
+    @opts = OptionParser.new do |opts|
+      opts.banner = "Usage: #{File.basename($0)} [options]"
+      opts.on('--help', '-h', 'Issue this message') do
+        puts opts
+        rc = false
+      end
+      opts.on('--input [INPUT]', '-i', 'input CSV file') do |arg|
+        @input = arg
+      end
+      opts.on('--series [SERIES]', '-S', 'match series') do |arg|
+        @series = SERIES[arg]
+        raise 'oops' if @series.nil?
+      end
+      opts.on('--scale [SCALE]', '-s', 'match scale') do |arg|
+        @scale = arg
+      end
+      opts.on('--x-offset [OFFSET]', '-x', 'set name x offset') do |arg|
+        @xoffset = arg.to_f
+      end
+      opts.on('--y-offset [OFFSET]', '-y', 'set name y offset') do |arg|
+        @yoffset = arg.to_f
+      end
+      opts.on('--bounds [BOUNDS]', '-b', 'set bounds') do |arg|
+        @bounds = arg.split(',').map { |a| a.to_f }
+        raise 'oops' if @bounds.length != 4
+      end
+      opts.on('--mask [MASK]', '-m', 'mask file') do |arg|
+        @mask = arg.split(',').map { |a| a.to_f }
+      end
+      opts.on('--header', '-H', 'show header') do
+        @header = true
+      end
+      opts.on('--integer', '-I', 'use integer coordinates') do
+        @cvt_i = true
+      end
+      opts.on('--debug', '-d', 'show debug') do
+        @debug = true
+      end
+      opts.on('--output [FILE]', '-o', 'output file') do |arg|
+        @output = File.new(arg, "w+")
+      end
+    end
+    @opts.parse!(@argv)
+
+    if @argv.length != 0
+      @opts.banner
+      rc = false
+    end
+
+    rc
+  end
+
+  # show header and offsets (debug)
+  def show_header(row)
+    row.each_with_index do |s,i|
+      @output.puts "# #{i} #{s}"
+    end
+  end
+
+  # convert string value to int or float as needed
+  def cvt(s)
+    @cvt_i ? s.to_i : s.to_f
+  end
+
+  # add a row to @data if a scale match
+  def add_data(row)
+    north = cvt(row[45])
+    west  = cvt(row[46])
+    south = cvt(row[47])
+    east  = cvt(row[48])
+    x = west + @xoffset
+    y = south + @yoffset
+    name = row[3]
+    #dx = (east - west).abs
+    #dy = (north - south).abs
+
+    #raise "oops - dx:#{dx}" if (dx - 0.5).abs > 0.5
+    #raise "oops - dy:#{dy}" if (dy - 0.5).abs > 0.5
+
+    if !@bounds.nil?
+      return if north > @bounds[0]
+      return if west < @bounds[1]
+      return if south < @bounds[2]
+      return if east > @bounds[3]
+    end
+
+    if !@series.nil? && (east - west - @series).abs > SERIES_EPSILON
+      return if name != 'Bouquet Reservoir'
+    end
+    if row[5] != @scale
+      return
+    end
+    # puts "#{name} #{north} #{west} #{south} #{east} #{x} #{y} #{@xoffset} #{@yoffset}"
+    @region << [north,west,south,east]
+
+    if @data[x].nil?
+      @data[x] = {}
+    end
+    if !@data[x][y].nil? && @data[x][y] != name
+      puts "Warning: #{x}#{y}=#{@data[x][y]} ignoring #{name}"
+    else
+      @data[x][y] = name
+    end
+    if @debug
+      @output.puts "#DEBUG #{row[0]} #{row[3]} #{row[4]} #{row[5]} #{row[45]} #{row[46]} #{row[47]} #{row[48]}"
+    end
+    # puts row[5]
+  end
+
+  # handle a row
+  def handle(idx,row)
+    if idx == 0 && @header
+      show_header(row)
+    else
+      add_data(row)
+    end
+  end
+
+  def gen_mask
+  end
+
+  # perform operation
+  def op
+    raise "no scale" if @scale.nil?
+    raise "no X offset" if @xoffset.nil?
+    raise "no Y offset" if @yoffset.nil?
+    File.open(@input) do |file|
+      n = 0
+      CSV.foreach(file) do |row|
+        handle(n,row)
+        n += 1
+      end
+    end
+    @data.sort.each do |x,yname|
+      yname.sort.each do |y,name|
+        # GMT pstext format
+        @output.puts "#{x}, #{y}, #{name}"
+      end
+    end
+    if !@mask.nil?
+      gen_mask
+    end
+  end
+end
+
+xname = ExtractName.new
+if xname.options(ARGV)
+  xname.op
+end
