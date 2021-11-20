@@ -33,19 +33,15 @@ name=`basename $1 .pdf`
 # See https://docs.generic-mapping-tools.org/6.2/cookbook/map-projections.html
 proj=-Jl-118/33/34/33.5/1:500000
 
-# -Rwest/east/south/north
-# Los Angeles Region + Catalina
-#region=-R-119/-117/32/35
-# Los Angeles Region - Catalina
+# Los Angeles Region
 region=-R-119/-117.5/33.7/34.9
 
 # area: large min to clip out various large bodies of water
 area=-A5000/1/4
 
-#    gmt clip us.xyg $region $proj #-W1p,blue
-
+    # gmt pstext label.xyt $region $proj -F'+f10p'
 gmt begin $name
-    gmt basemap $region $proj -Bxg0.1d -Byg0.1d
+    gmt basemap $region $proj -Bxg0.1d -Byg0.1d -Bx0.5 -By0.5
     gmt pstext la-ca-6min-name.xyt $region $proj -F'+f5p'
     gmt coast $area $region $proj -N1/,,.- -N2/,,.- -N3/,,.- -W
 gmt end # show
