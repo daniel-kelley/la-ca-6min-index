@@ -44,4 +44,5 @@ gmt begin $name
     gmt basemap $region $proj -Bxg0.1d -Byg0.1d -Bx0.5 -By0.5
     gmt pstext la-ca-6min-name.xyt $region $proj -F'+f5p'
     gmt coast $area $region $proj -N1/,,.- -N2/,,.- -N3/,,.- -W
+    gmt plot la-county.xy $region
 gmt end # show

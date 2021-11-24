@@ -11,7 +11,7 @@ OUTPUT += la-ca-6min-name.xyt
 
 all: $(OUTPUT)
 
-la-ca-6min-base-map.pdf: gen.sh la-ca-6min-name.xyt
+la-ca-6min-base-map.pdf: gen.sh la-ca-6min-name.xyt la-county.xy
 	./$< $@
 
 # east was -117
